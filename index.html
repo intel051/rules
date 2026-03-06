@@ -1,174 +1,204 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowUp, ShieldCheck, BarChart3 } from 'lucide-react';
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>파생상품 규정 도우미</title>
+    
+    <!-- SUIT Variable Font -->
+    <link href="https://cdn.jsdelivr.net/gh/sun-typeface/SUIT@2/fonts/variable/woff2/SUIT-Variable.css" rel="stylesheet">
+    
+    <!-- Tailwind CSS & React Libraries -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://unpkg.com/framer-motion@10.16.4/dist/framer-motion.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
 
-const App = () => {
-  const [input, setInput] = useState('');
-  const [messages, setMessages] = useState([
-    {
-      id: 'init',
-      role: 'assistant',
-      content: "**파생상품 업무규정** 분석 전문가예요.\n무엇을 도와드릴까요?",
-      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-    }
-  ]);
-  const [isLoading, setIsLoading] = useState(false);
-  const scrollRef = useRef(null);
-
-  useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-    }
-  }, [messages, isLoading]);
-
-  const renderContent = (text) => {
-    return text.split('\n').map((line, i) => {
-      const parts = line.split(/(\*\*.*?\*\*)/g);
-      return (
-        <div key={i} className="min-h-[1.5em] mb-1">
-          {parts.map((part, j) => {
-            if (part.startsWith('**') && part.endsWith('**')) {
-              return <span key={j} className="font-bold text-[#3182F6]">{part.slice(2, -2)}</span>;
-            }
-            return part;
-          })}
-        </div>
-      );
-    });
-  };
-
-  const handleSend = async (e) => {
-    if (e) e.preventDefault();
-    if (!input.trim() || isLoading) return;
-
-    const currentInput = input;
-    const userMsg = {
-      id: Date.now().toString(),
-      role: 'user',
-      content: currentInput,
-      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-    };
-
-    setMessages(prev => [...prev, userMsg]);
-    setInput('');
-    setIsLoading(true);
-
-    try {
-      const response = await fetch('/api/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: currentInput })
-      });
-      const data = await response.json();
-      setMessages(prev => [...prev, {
-        id: Date.now() + 1,
-        role: 'assistant',
-        content: data.text || "답변을 가져오지 못했어요.",
-        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-      }]);
-    } catch (err) {
-      setMessages(prev => [...prev, {
-        id: 'err',
-        role: 'assistant',
-        content: "오류가 발생했습니다. 잠시 후 다시 시도해 주세요.",
-        time: ""
-      }]);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  return (
-    <div className="flex flex-col h-screen max-w-full md:max-w-lg mx-auto bg-white border-x border-gray-100 overflow-hidden shadow-2xl">
-      <link href="https://cdn.jsdelivr.net/gh/sun-typeface/SUIT@2/fonts/variable/woff2/SUIT-Variable.css" rel="stylesheet" />
-      <style>{`
-        * { font-family: 'SUIT Variable', sans-serif !important; letter-spacing: -0.02em; }
+    <style>
+        /* 폰트 및 기본 설정 */
+        * {
+            font-family: 'SUIT Variable', sans-serif !important;
+            letter-spacing: -0.02em;
+            -webkit-font-smoothing: antialiased;
+            box-sizing: border-box;
+        }
+        body { background-color: #F0F6FF; margin: 0; padding: 0; height: 100dvh; display: flex; justify-content: center; overflow: hidden; }
+        #root { width: 100%; height: 100%; max-width: 500px; background: white; display: flex; flex-direction: column; position: relative; }
         .no-scrollbar::-webkit-scrollbar { display: none; }
-      `}</style>
+        
+        /* [핵심 수정] 말풍선 글자 넘침 방지 */
+        .bubble-content { 
+            word-break: break-all;      /* 긴 단어 강제 줄바꿈 */
+            overflow-wrap: anywhere;    /* 긴 숫자/영문 강제 줄바꿈 */
+            white-space: pre-wrap;      /* 줄바꿈 유지 */
+            display: block;
+            width: 100%;
+        }
+        
+        /* 강조 텍스트: AI의 볼드체를 파란색으로 렌더링 */
+        .highlight { color: #3182F6; font-weight: 800; }
+        
+        /* 모바일 하단 대응 */
+        .safe-bottom { padding-bottom: env(safe-area-inset-bottom); }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
 
-      {/* Header */}
-      <nav className="flex items-center gap-3 px-6 py-4 bg-white/90 backdrop-blur-md sticky top-0 z-20 border-b border-gray-100">
-        <div className="w-10 h-10 bg-[#3182F6] rounded-2xl flex items-center justify-center text-white shadow-lg shadow-blue-100">
-          <BarChart3 size={22} />
-        </div>
-        <div>
-          <h1 className="text-[17px] font-bold text-gray-900 leading-tight">규정 분석기</h1>
-          <div className="flex items-center gap-1.5 mt-0.5">
-            <span className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-pulse"></span>
-            <span className="text-[10px] font-bold text-[#3182F6] uppercase tracking-widest">KRX AI Agent</span>
-          </div>
-        </div>
-      </nav>
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+        const { motion, AnimatePresence } = window.Motion;
 
-      {/* Chat Area - 글자 넘침 방지 속성 적용 */}
-      <main ref={scrollRef} className="flex-1 overflow-y-auto px-5 py-6 space-y-8 no-scrollbar bg-[#F2F7FF]">
-        <AnimatePresence initial={false}>
-          {messages.map((m) => (
-            <motion.div
-              key={m.id}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}
-            >
-              <div className={`max-w-[85%] ${m.role === 'user' ? 'items-end' : 'items-start'}`}>
-                {/* break-words, whitespace-pre-wrap 속성이 핵심 */}
-                <div className={`px-4 py-3 rounded-[22px] text-[15px] leading-relaxed shadow-sm break-words whitespace-pre-wrap overflow-wrap-anywhere ${
-                  m.role === 'user' 
-                  ? 'bg-[#3182F6] text-white rounded-tr-none' 
-                  : 'bg-white text-gray-800 rounded-tl-none border border-blue-50/50'
-                }`}>
-                  {renderContent(m.content)}
+        const App = () => {
+            const [input, setInput] = useState('');
+            const [messages, setMessages] = useState([
+                {
+                    id: 'init',
+                    role: 'assistant',
+                    content: "안녕하세요! '파생상품시장 업무규정' 분석 전문가예요. 궁금하신 내용을 입력해주시면 빠르게 찾아드릴게요.",
+                    time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                }
+            ]);
+            const [isLoading, setIsLoading] = useState(false);
+            const scrollRef = useRef(null);
+
+            useEffect(() => {
+                if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+                if (window.lucide) window.lucide.createIcons();
+            }, [messages, isLoading]);
+
+            // 볼드체(**)를 렌더링용 엘리먼트로 변환
+            const renderMessage = (text) => {
+                return text.split('\n').map((line, i) => {
+                    const parts = line.split(/(\*\*.*?\*\*)/g);
+                    return (
+                        <div key={i} className="min-h-[1.5em]">
+                            {parts.map((part, j) => {
+                                if (part.startsWith('**') && part.endsWith('**')) {
+                                    return <span key={j} className="highlight">{part.slice(2, -2)}</span>;
+                                }
+                                return part;
+                            })}
+                        </div>
+                    );
+                });
+            };
+
+            const handleSend = async (e) => {
+                if (e) e.preventDefault();
+                if (!input.trim() || isLoading) return;
+
+                const userQuery = input;
+                setMessages(prev => [...prev, {
+                    id: Date.now().toString(),
+                    role: 'user',
+                    content: userQuery,
+                    time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                }]);
+                setInput('');
+                setIsLoading(true);
+
+                try {
+                    const response = await fetch('/api/chat', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ query: userQuery })
+                    });
+                    const data = await response.json();
+                    
+                    setMessages(prev => [...prev, {
+                        id: (Date.now() + 1).toString(),
+                        role: 'assistant',
+                        content: data.text || "답변을 가져오지 못했어요.",
+                        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                    }]);
+                } catch (err) {
+                    setMessages(prev => [...prev, { id: 'err', role: 'assistant', content: "연결이 원활하지 않아요. 다시 시도해주세요.", time: "" }]);
+                } finally {
+                    setIsLoading(false);
+                }
+            };
+
+            return (
+                <div className="flex flex-col h-full w-full bg-[#F8FAFF]">
+                    {/* Header */}
+                    <header className="px-6 py-5 flex items-center justify-between bg-white border-b border-blue-50/50 sticky top-0 z-30">
+                        <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 bg-[#3182F6] rounded-2xl flex items-center justify-center text-white shadow-lg shadow-blue-100">
+                                <i data-lucide="bar-chart-3" size="22"></i>
+                            </div>
+                            <div>
+                                <h1 className="text-[17px] font-bold text-gray-900 leading-tight">규정 도우미</h1>
+                                <div className="flex items-center gap-1.5 mt-0.5">
+                                    <span className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-pulse"></span>
+                                    <span className="text-[10px] font-bold text-[#3182F6] uppercase tracking-widest">KRX AI Expert</span>
+                                </div>
+                            </div>
+                        </div>
+                    </header>
+
+                    {/* Chat Area */}
+                    <main ref={scrollRef} className="flex-1 overflow-y-auto px-5 py-6 space-y-7 no-scrollbar">
+                        <AnimatePresence initial={false}>
+                            {messages.map((m) => (
+                                <motion.div key={m.id} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                                    <div className={`max-w-[85%] ${m.role === 'user' ? 'items-end' : 'items-start'}`}>
+                                        <div className={`px-4.5 py-3 rounded-[22px] text-[15px] leading-relaxed bubble-content shadow-sm ${
+                                            m.role === 'user' 
+                                            ? 'bg-[#3182F6] text-white rounded-tr-none' 
+                                            : 'bg-white text-gray-800 rounded-tl-none border border-blue-50/50'
+                                        }`}>
+                                            {renderMessage(m.content)}
+                                        </div>
+                                        <div className="text-[10px] text-gray-400 mt-1.5 px-1 font-semibold opacity-60 uppercase">{m.time}</div>
+                                    </div>
+                                </motion.div>
+                            ))}
+                            {isLoading && (
+                                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex justify-start">
+                                    <div className="bg-white/60 backdrop-blur-sm px-5 py-3.5 rounded-[22px] rounded-tl-none flex items-center gap-3 border border-blue-50/30">
+                                        <div className="flex gap-1.5">
+                                            <div className="w-1.5 h-1.5 bg-blue-300 rounded-full animate-bounce" style={{animationDelay:'0ms'}}></div>
+                                            <div className="w-1.5 h-1.5 bg-blue-300 rounded-full animate-bounce" style={{animationDelay:'150ms'}}></div>
+                                            <div className="w-1.5 h-1.5 bg-blue-300 rounded-full animate-bounce" style={{animationDelay:'300ms'}}></div>
+                                        </div>
+                                        <span className="text-[12px] text-blue-400 font-bold">규정 대조 중</span>
+                                    </div>
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
+                    </main>
+
+                    {/* Footer Input: 버튼 사이즈 고정 및 입력창 줄어듬 방지 */}
+                    <div className="bg-white px-4 pt-3 pb-6 border-t border-blue-50/30 safe-bottom flex-shrink-0">
+                        <form onSubmit={handleSend} className="flex items-center gap-2 bg-[#F2F6FF] p-1.5 rounded-[22px] border border-transparent focus-within:border-[#3182F6] focus-within:bg-white transition-all shadow-inner w-full overflow-hidden">
+                            <input 
+                                type="text" 
+                                value={input} 
+                                onChange={(e) => setInput(e.target.value)} 
+                                placeholder="궁금한 규정을 입력하세요" 
+                                className="flex-1 min-w-0 bg-transparent px-4 py-3 text-[15px] outline-none placeholder-blue-300/80 text-gray-800" 
+                            />
+                            <button 
+                                type="submit" 
+                                disabled={!input.trim() || isLoading} 
+                                className={`w-12 h-12 flex-shrink-0 rounded-[18px] flex items-center justify-center transition-all ${
+                                    input.trim() && !isLoading ? 'bg-[#3182F6] text-white shadow-lg shadow-blue-100' : 'bg-gray-200 text-gray-400'
+                                }`}
+                            >
+                                <i data-lucide="arrow-up" size="22"></i>
+                            </button>
+                        </form>
+                    </div>
                 </div>
-                <div className="text-[10px] text-gray-400 mt-2 px-1 font-semibold opacity-60 uppercase">{m.time}</div>
-              </div>
-            </motion.div>
-          ))}
-          {isLoading && (
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex justify-start">
-              <div className="bg-white/60 backdrop-blur-sm px-5 py-3.5 rounded-[22px] rounded-tl-none flex items-center gap-3 border border-blue-50/30">
-                <div className="flex gap-1.5">
-                  <div className="w-1.5 h-1.5 bg-blue-300 rounded-full animate-bounce" style={{animationDelay:'0ms'}}></div>
-                  <div className="w-1.5 h-1.5 bg-blue-300 rounded-full animate-bounce" style={{animationDelay:'150ms'}}></div>
-                  <div className="w-1.5 h-1.5 bg-blue-300 rounded-full animate-bounce" style={{animationDelay:'300ms'}}></div>
-                </div>
-                <span className="text-[12px] text-blue-400 font-bold">분석하는 중</span>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </main>
+            );
+        };
 
-      {/* Input Area - 레이아웃 안정성 확보 */}
-      <div className="bg-white px-4 pt-3 pb-8 border-t border-gray-100 flex-shrink-0">
-        <form 
-          onSubmit={handleSend} 
-          className="flex items-center gap-2 bg-[#F2F6FF] p-1.5 rounded-[22px] border border-transparent focus-within:border-[#3182F6] focus-within:bg-white transition-all shadow-inner w-full"
-        >
-          <input 
-            type="text"
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            placeholder="질문을 입력하세요"
-            className="flex-1 min-w-0 bg-transparent px-4 py-3 text-[15px] outline-none text-gray-800"
-          />
-          <button 
-            type="submit"
-            disabled={!input.trim() || isLoading}
-            className={`w-12 h-12 flex-shrink-0 rounded-[18px] flex items-center justify-center transition-all ${
-              input.trim() && !isLoading ? 'bg-[#3182F6] text-white shadow-lg' : 'bg-gray-200 text-gray-400'
-            }`}
-          >
-            <ArrowUp size={22} />
-          </button>
-        </form>
-        <div className="mt-4 flex items-center justify-center gap-1.5 opacity-30">
-          <ShieldCheck size={12} className="text-blue-500" />
-          <span className="text-[10px] font-bold text-blue-600 tracking-tighter uppercase">KRX DATA VERIFIED</span>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-export default App;
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
 
