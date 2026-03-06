@@ -19,7 +19,7 @@
     <style>
         * {
             font-family: 'SUIT Variable', sans-serif !important;
-            letter-spacing: -0.025em; /* 자간을 조금 더 좁혀 가독성 향상 */
+            letter-spacing: -0.025em;
             -webkit-font-smoothing: antialiased;
             box-sizing: border-box;
         }
@@ -27,19 +27,22 @@
         #root { width: 100%; height: 100%; max-width: 500px; background: white; display: flex; flex-direction: column; position: relative; overflow: hidden; }
         .no-scrollbar::-webkit-scrollbar { display: none; }
         
-        /* [중대 수정] 말풍선 여백 및 글자 비율 조정 */
+        /* [핵심 수정] 말풍선 글자 넘침 방지 및 텍스트 비율 */
         .bubble-box { 
             display: inline-block;
             max-width: 100%; 
             word-wrap: break-word;
-            word-break: break-all;      /* 모바일 환경 강제 줄바꿈 최우선 */
+            word-break: break-all;
             overflow-wrap: anywhere; 
             white-space: pre-wrap;
-            line-height: 1.6;           /* 행간을 넓혀 가독성 확보 */
-            font-size: 14.5px;          /* 글자 비율을 살짝 낮춤 */
+            line-height: 1.6;
+            font-size: 14.5px; /* 요청하신 글자 비율 조정 */
         }
 
-        .highlight { color: #3182F6; font-weight: 700; }
+        /* 강조 색상 정의 */
+        .text-main-blue { color: #3182F6; font-weight: 800; }
+        .text-pastel-red { color: #FF8A8A; font-weight: 800; }
+        
         .safe-bottom { padding-bottom: env(safe-area-inset-bottom); }
     </style>
 </head>
@@ -56,7 +59,7 @@
                 {
                     id: 'init',
                     role: 'assistant',
-                    content: "안녕하세요. \"파생상품시장 업무규정\"에 대해 궁금한 점이 있다면 무엇이든 물어보세요.",
+                    content: "국내파생상품 시장의 규정을 찾아 드릴게요. 궁금한 내용을 입력해주세요.",
                     time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
                 }
             ]);
@@ -68,15 +71,23 @@
                 if (window.lucide) window.lucide.createIcons();
             }, [messages, isLoading]);
 
-            const renderMessage = (text) => {
+            // 텍스트 렌더링: 섹션 타이틀(레드) vs 일반 강조(블루) 분기 처리
+            const renderContent = (text) => {
+                const labels = ["한 줄 요약", "상세 답변", "관련 조항", "유의사항"];
+                
                 return text.split('\n').map((line, i) => {
-                    // AI가 보낸 볼드체(**)를 파란색 볼드체로 변환
                     const parts = line.split(/(\*\*.*?\*\*)/g);
                     return (
-                        <div key={i} className="min-h-[1.4em] mb-0.5">
+                        <div key={i} className="min-h-[1.4em] mb-1">
                             {parts.map((part, j) => {
                                 if (part.startsWith('**') && part.endsWith('**')) {
-                                    return <span key={j} className="highlight">{part.slice(2, -2)}</span>;
+                                    const rawText = part.slice(2, -2);
+                                    // 특정 라벨인 경우 파스텔 레드 적용
+                                    if (labels.includes(rawText)) {
+                                        return <span key={j} className="text-pastel-red">{rawText}</span>;
+                                    }
+                                    // 일반 강조인 경우 메인 블루 적용
+                                    return <span key={j} className="text-main-blue">{rawText}</span>;
                                 }
                                 return part;
                             })}
@@ -109,28 +120,27 @@
                     setMessages(prev => [...prev, {
                         id: (Date.now() + 1).toString(),
                         role: 'assistant',
-                        content: data.text || "답변을 가져오지 못했어요.",
+                        content: data.text || "데이터를 불러오는 데 실패했어요.",
                         time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
                     }]);
                 } catch (err) {
-                    setMessages(prev => [...prev, { id: 'err', role: 'assistant', content: "연결이 원활하지 않아요.", time: "" }]);
+                    setMessages(prev => [...prev, { id: 'err', role: 'assistant', content: "연결이 원활하지 않아요. 다시 시도해 주세요.", time: "" }]);
                 } finally {
                     setIsLoading(false);
                 }
             };
 
             return (
-                <div className="flex flex-col h-full w-full bg-[#F2F7FF] overflow-hidden">
-                    <header className="px-6 py-5 flex items-center justify-between bg-white/90 backdrop-blur-xl border-b border-blue-50/50 sticky top-0 z-30 shadow-sm flex-shrink-0">
+                <div className="flex flex-col h-full w-full bg-[#F2F7FF]">
+                    <header className="px-6 py-5 flex items-center justify-between bg-white border-b border-blue-50/50 sticky top-0 z-30 shadow-sm flex-shrink-0">
                         <div className="flex items-center gap-3">
                             <div className="w-10 h-10 bg-[#3182F6] rounded-2xl flex items-center justify-center text-white shadow-lg shadow-blue-100">
-                                <i data-lucide="shield-check" size="22"></i>
+                                <i data-lucide="file-search-2" size="22"></i>
                             </div>
                             <div>
-                                <h1 className="text-[17px] font-bold text-gray-900 leading-tight">규정 분석기</h1>
-                                <div className="flex items-center gap-1.5 mt-0.5">
-                                    <span className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-pulse"></span>
-                                    <span className="text-[10px] font-bold text-[#3182F6] uppercase tracking-widest tracking-tight">Official KRX Expert</span>
+                                <h1 className="text-[17px] font-bold text-gray-900 leading-tight">파생규정 AI</h1>
+                                <div className="flex items-center gap-1.5 mt-0.5 font-bold text-[#3182F6] text-[10px] tracking-widest uppercase">
+                                    Official KRX Insight
                                 </div>
                             </div>
                         </div>
@@ -140,15 +150,15 @@
                         <AnimatePresence initial={false}>
                             {messages.map((m) => (
                                 <motion.div key={m.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'} w-full`}>
-                                    <div className={`flex flex-col ${m.role === 'user' ? 'items-end' : 'items-start'} max-w-[85%]`}>
+                                    <div className={`flex flex-col ${m.role === 'user' ? 'items-end' : 'items-start'} max-w-[88%]`}>
                                         <div className={`px-5 py-3.5 rounded-[22px] bubble-box shadow-sm ${
                                             m.role === 'user' 
-                                            ? 'bg-[#3182F6] text-white rounded-tr-none' 
+                                            ? 'bg-[#3182F6] text-white rounded-tr-none shadow-md' 
                                             : 'bg-white text-gray-800 rounded-tl-none border border-blue-50/50'
                                         }`}>
-                                            {renderMessage(m.content)}
+                                            {renderContent(m.content)}
                                         </div>
-                                        <div className="text-[10px] text-gray-400 mt-2 px-1 font-semibold opacity-60 uppercase tracking-tighter">{m.time}</div>
+                                        <div className="text-[10px] text-gray-400 mt-2 px-1 font-semibold opacity-60 uppercase">{m.time}</div>
                                     </div>
                                 </motion.div>
                             ))}
@@ -160,7 +170,7 @@
                                             <div className="w-1.5 h-1.5 bg-blue-300 rounded-full animate-bounce" style={{animationDelay:'150ms'}}></div>
                                             <div className="w-1.5 h-1.5 bg-blue-300 rounded-full animate-bounce" style={{animationDelay:'300ms'}}></div>
                                         </div>
-                                        <span className="text-[12px] text-blue-400 font-bold">분석 중</span>
+                                        <span className="text-[12px] text-blue-400 font-bold">규정 대조 중</span>
                                     </div>
                                 </motion.div>
                             )}
@@ -169,20 +179,8 @@
 
                     <div className="bg-white px-4 pt-3 pb-8 border-t border-blue-50/30 safe-bottom flex-shrink-0">
                         <form onSubmit={handleSend} className="flex items-center gap-2 bg-[#F2F6FF] p-1.5 rounded-[24px] border border-transparent focus-within:border-[#3182F6] focus-within:bg-white transition-all shadow-inner w-full">
-                            <input 
-                                type="text" 
-                                value={input} 
-                                onChange={(e) => setInput(e.target.value)} 
-                                placeholder="질문을 입력하세요" 
-                                className="flex-1 min-w-0 bg-transparent px-4 py-3 text-[15px] outline-none text-gray-800" 
-                            />
-                            <button 
-                                type="submit" 
-                                disabled={!input.trim() || isLoading} 
-                                className={`w-12 h-12 flex-shrink-0 rounded-[20px] flex items-center justify-center transition-all ${
-                                    input.trim() && !isLoading ? 'bg-[#3182F6] text-white shadow-lg shadow-blue-100' : 'bg-gray-200 text-gray-400'
-                                }`}
-                            >
+                            <input type="text" value={input} onChange={(e) => setInput(e.target.value)} placeholder="질문을 입력하세요" className="flex-1 min-w-0 bg-transparent px-4 py-3 text-[15px] outline-none text-gray-800" />
+                            <button type="submit" disabled={!input.trim() || isLoading} className={`w-12 h-12 flex-shrink-0 rounded-[20px] flex items-center justify-center transition-all ${input.trim() && !isLoading ? 'bg-[#3182F6] text-white shadow-lg' : 'bg-gray-200 text-gray-400'}`}>
                                 <i data-lucide="arrow-up" size="22"></i>
                             </button>
                         </form>
