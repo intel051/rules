@@ -1,38 +1,18 @@
-// Vercel Serverless Function
 export default async function handler(req, res) {
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
-  }
+  if (req.method !== 'POST') return res.status(405).end();
 
   const { query } = req.body;
-  // Vercel 환경 변수에서 키를 가져옵니다.
   const apiKey = process.env.GEMINI_API_KEY;
 
-  if (!apiKey) {
-    return res.status(500).json({ error: 'API Key not configured' });
-  }
-
   const SYSTEM_PROMPT = `
-  너는 "한국거래소(KRX) 파생상품시장 업무규정 및 시행세칙" 전문가야.
-  사용자의 질문에 대해 정확하게 답변해줘.
+  너는 한국거래소(KRX) 파생상품시장 업무규정 및 시행세칙 전문가야.
+  사용자의 질문에 대해 조항을 근거로 정확하게 답변해줘.
 
-  # 스타일
-  1. 토스처럼 아주 간결하고 깔끔한 문체 사용 (~해요, ~예요).
-  2. 강조하고 싶은 단어나 문구는 반드시 **볼드체**로 작성해. 별표 기호는 빼지 말고 포함해줘.
-  3. 인사말 없이 본론부터 시작해.
-
-  # 답변 양식
-  **한 줄 요약**
-  내용 요약
-
-  **상세 답변**
-  1. 내용 (**볼드체** 활용)
-  
-  **관련 조항**
-  규정 제○조
-
-  **유의사항**
-  주의점 한 문장.
+  # 답변 스타일
+  1. 토스처럼 아주 간결하고 명확한 문체 사용 (~해요, ~예요).
+  2. 강조할 때 중요한 수치나 용어는 "따옴표"와 **볼드체** 형식을 적절히 섞어줘.
+  3. 답변 양식: "한 줄 요약", "상세 답변", "관련 조항", "유의사항" 순서로 작성해.
+  4. 답변 중 긴 수치나 영어 단어가 있을 경우 말풍선 줄바꿈이 일어날 수 있도록 공백을 적절히 사용해.
   `;
 
   try {
@@ -47,11 +27,9 @@ export default async function handler(req, res) {
     });
 
     const data = await response.json();
-    const text = data.candidates?.[0]?.content?.parts?.[0]?.text || "답변을 생성할 수 없습니다.";
-    
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
     res.status(200).json({ text });
-  } catch (error) {
-    res.status(500).json({ error: 'Failed to fetch from Gemini' });
+  } catch (err) {
+    res.status(500).json({ error: "API Error" });
   }
 }
-
