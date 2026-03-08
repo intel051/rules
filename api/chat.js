@@ -1,37 +1,43 @@
 import { google } from 'googleapis';
 
 export default async function handler(req, res) {
-  if (req.method !== 'POST') return res.status(405).end();
+  if (req.method !== 'POST') return res.status(405).json({ error: "Method Not Allowed" });
 
   const { query } = req.body;
   const apiKey = process.env.GEMINI_API_KEY;
   const serviceAccountJson = process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
   const driveFileIds = process.env.DRIVE_FILE_IDS;
 
+  // 1. 환경 변수 누락 체크
   if (!apiKey || !serviceAccountJson || !driveFileIds) {
-    return res.status(500).json({ error: "환경 변수 설정이 누락되었습니다." });
+    return res.status(500).json({ 
+      error: "Vercel 환경 변수(API_KEY, JSON, FILE_IDS) 중 일부가 설정되지 않았어요. 대시보드를 확인해 주세요." 
+    });
   }
 
   try {
-    // 1. 서비스 계정 JSON 파싱 및 Private Key 줄바꿈 수정 (Vercel 특화)
-    const serviceAccount = JSON.parse(serviceAccountJson);
-    if (serviceAccount.private_key) {
-      serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, '\n');
+    // 2. JSON 파싱 및 Private Key 복구
+    let serviceAccount;
+    try {
+      serviceAccount = JSON.parse(serviceAccountJson);
+    } catch (e) {
+      return res.status(500).json({ error: "GOOGLE_SERVICE_ACCOUNT_JSON 형식이 올바른 JSON이 아니에요. 복사할 때 오타가 났는지 확인해 주세요." });
     }
 
-    const fileIds = driveFileIds.split(',').map(id => id.trim());
+    const privateKey = serviceAccount.private_key ? serviceAccount.private_key.replace(/\\n/g, '\n') : null;
+    if (!privateKey) return res.status(500).json({ error: "JSON 내부에 private_key가 없어요." });
 
-    // 2. Google Drive 인증 설정
+    // 3. Google Drive 인증 및 파일 로드
     const auth = new google.auth.JWT(
       serviceAccount.client_email,
       null,
-      serviceAccount.private_key,
+      privateKey,
       ['https://www.googleapis.com/auth/drive.readonly']
     );
 
     const drive = google.drive({ version: 'v3', auth });
+    const fileIds = driveFileIds.split(',').map(id => id.trim());
 
-    // 3. 드라이브에서 PDF 파일들 읽기
     const fileParts = await Promise.all(fileIds.map(async (fileId) => {
       try {
         const response = await drive.files.get(
@@ -44,53 +50,51 @@ export default async function handler(req, res) {
             data: Buffer.from(response.data).toString('base64')
           }
         };
-      } catch (fileErr) {
-        console.error(`File ID ${fileId} 접근 실패:`, fileErr.message);
+      } catch (err) {
+        console.error(`File ${fileId} 접근 실패:`, err.message);
         return null;
       }
     }));
 
-    const validFileParts = fileParts.filter(part => part !== null);
-
-    if (validFileParts.length === 0) {
-      return res.status(500).json({ error: "드라이브 파일에 접근할 수 없습니다. 권한 설정을 확인해주세요." });
+    const validParts = fileParts.filter(p => p !== null);
+    if (validParts.length === 0) {
+      return res.status(500).json({ error: "구글 드라이브 파일에 접근할 수 없어요. 서비스 계정 이메일을 PDF 공유 대상(뷰어)으로 추가했는지 확인해 주세요." });
     }
 
-    const SYSTEM_PROMPT = `
-      너는 한국거래소(KRX) 파생상품시장 업무규정 전문가야.
+    // 4. Gemini API 호출
+    const systemInstruction = `
+      너는 한국거래소(KRX) "해외주식파생부 국내파생팀" 소속의 파생상품시장 업무규정 전문가야.
       
       # 답변 원칙
       1. 토스처럼 아주 간결하고 깔끔하게 대답해 (~해요).
-      2. 강조할 때 큰따옴표(")나 ### 기호를 절대 쓰지 마.
-      3. 중요 수치, 조항, 용어는 반드시 **볼드체** 형식으로 감싸줘. (파란색으로 표시됨)
-      4. 답변 양식: **한 줄 요약**, **상세 답변**, **관련 조항**, **유의사항** 필수.
-      5. 검색 시 할루시네이션이 없도록 한 번 더 검증 후 대답해줘.
+      2. 섹션 타이틀 앞의 ### 기호는 절대 쓰지 마.
+      3. 강조가 필요한 부분은 따옴표(")를 사용하거나 **볼드체** 형식을 사용해. (UI에서 파란색으로 변함)
+      4. 답변 양식: 아래 4개 제목을 반드시 포함해.
+         - **한 줄 요약**
+         - **상세 답변**
+         - **관련 조항**
+         - **유의사항**
+      5. 제공된 PDF 내용을 최우선으로 분석하고, 검색 결과를 통해 할루시네이션이 없도록 검증해.
     `;
 
-    // 4. Gemini API 호출 (Google Search Grounding 포함)
     const geminiRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        contents: [{
-          parts: [...validFileParts, { text: query }]
-        }],
-        systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
+        contents: [{ parts: [...validParts, { text: query }] }],
+        systemInstruction: { parts: [{ text: systemInstruction }] },
         tools: [{ "google_search": {} }]
       })
     });
 
     const result = await geminiRes.json();
-    
-    if (result.error) {
-      return res.status(500).json({ error: `AI 응답 오류: ${result.error.message}` });
-    }
+    if (result.error) throw new Error(`Gemini API 오류: ${result.error.message}`);
 
     const text = result.candidates?.[0]?.content?.parts?.[0]?.text;
-    res.status(200).json({ text });
+    res.status(200).json({ text: text || "답변을 생성하지 못했어요." });
 
   } catch (err) {
-    console.error("Critical Error:", err.message);
-    res.status(500).json({ error: `데이터 처리 실패: ${err.message}` });
+    console.error("Critical Server Error:", err);
+    res.status(500).json({ error: `서버 오류 발생: ${err.message}` });
   }
 }
