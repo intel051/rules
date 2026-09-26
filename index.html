@@ -1,196 +1,32 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="ko">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>국내파생상품 규정 도우미</title>
-    
-    <!-- SUIT Variable Font -->
-    <link href="https://cdn.jsdelivr.net/gh/sun-typeface/SUIT@2/fonts/variable/woff2/SUIT-Variable.css" rel="stylesheet">
-    
-    <!-- Tailwind CSS & React -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-    <script src='https://unpkg.com/@babel/standalone@7.12.12/babel.min.js'></script>
-    <script src="https://unpkg.com/framer-motion@10.16.4/dist/framer-motion.js"></script>
-    <script src="https://unpkg.com/lucide@latest"></script>
-
-    <style>
-        * {
-            font-family: 'SUIT Variable', sans-serif !important;
-            letter-spacing: -0.025em;
-            -webkit-font-smoothing: antialiased;
-            box-sizing: border-box;
-        }
-        body { background-color: #F2F7FF; margin: 0; padding: 0; height: 100dvh; display: flex; justify-content: center; overflow: hidden; }
-        #root { width: 100%; height: 100%; max-width: 500px; background: white; display: flex; flex-direction: column; position: relative; overflow: hidden; }
-        .no-scrollbar::-webkit-scrollbar { display: none; }
-        
-        /* [핵심 수정] 말풍선 글자 넘침 방지 및 텍스트 비율 */
-        .bubble-box { 
-            display: inline-block;
-            max-width: 100%; 
-            word-wrap: break-word;
-            word-break: break-all;
-            overflow-wrap: anywhere; 
-            white-space: pre-wrap;
-            line-height: 1.6;
-            font-size: 14.5px; /* 요청하신 글자 비율 조정 */
-        }
-
-        /* 강조 색상 정의 */
-        .text-main-blue { color: #3182F6; font-weight: 800; }
-        .text-pastel-red { color: #FF8A8A; font-weight: 800; }
-        
-        .safe-bottom { padding-bottom: env(safe-area-inset-bottom); }
-    </style>
-</head>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#edf2f6"><title>규정 데스크 · 국내파생팀</title><link rel="stylesheet" href="/styles.css"><script src="/app.js" defer></script></head>
 <body>
-    <div id="root"></div>
-
-    <script type="text/babel">
-        const { useState, useEffect, useRef } = React;
-        const { motion, AnimatePresence } = window.Motion;
-
-        const App = () => {
-            const [input, setInput] = useState('');
-            const [messages, setMessages] = useState([
-                {
-                    id: 'init',
-                    role: 'assistant',
-                    content: "국내파생상품 시장의 규정을 찾아 드릴게요. 궁금한 내용을 입력해주세요.",
-                    time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-                }
-            ]);
-            const [isLoading, setIsLoading] = useState(false);
-            const scrollRef = useRef(null);
-
-            useEffect(() => {
-                if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-                if (window.lucide) window.lucide.createIcons();
-            }, [messages, isLoading]);
-
-            // 텍스트 렌더링: 섹션 타이틀(레드) vs 일반 강조(블루) 분기 처리
-            const renderContent = (text) => {
-                const labels = ["한 줄 요약", "상세 답변", "관련 조항", "유의사항"];
-                
-                return text.split('\n').map((line, i) => {
-                    const parts = line.split(/(\*\*.*?\*\*)/g);
-                    return (
-                        <div key={i} className="min-h-[1.4em] mb-1">
-                            {parts.map((part, j) => {
-                                if (part.startsWith('**') && part.endsWith('**')) {
-                                    const rawText = part.slice(2, -2);
-                                    // 특정 라벨인 경우 파스텔 레드 적용
-                                    if (labels.includes(rawText)) {
-                                        return <span key={j} className="text-pastel-red">{rawText}</span>;
-                                    }
-                                    // 일반 강조인 경우 메인 블루 적용
-                                    return <span key={j} className="text-main-blue">{rawText}</span>;
-                                }
-                                return part;
-                            })}
-                        </div>
-                    );
-                });
-            };
-
-            const handleSend = async (e) => {
-                if (e) e.preventDefault();
-                if (!input.trim() || isLoading) return;
-
-                const query = input;
-                setMessages(prev => [...prev, {
-                    id: Date.now().toString(),
-                    role: 'user',
-                    content: query,
-                    time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-                }]);
-                setInput('');
-                setIsLoading(true);
-
-                try {
-                    const response = await fetch('/api/chat', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ query })
-                    });
-                    const data = await response.json();
-                    setMessages(prev => [...prev, {
-                        id: (Date.now() + 1).toString(),
-                        role: 'assistant',
-                        content: data.text || "데이터를 불러오는 데 실패했어요.",
-                        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-                    }]);
-                } catch (err) {
-                    setMessages(prev => [...prev, { id: 'err', role: 'assistant', content: "연결이 원활하지 않아요. 다시 시도해 주세요.", time: "" }]);
-                } finally {
-                    setIsLoading(false);
-                }
-            };
-
-            return (
-                <div className="flex flex-col h-full w-full bg-[#F2F7FF]">
-                    <header className="px-6 py-5 flex items-center justify-between bg-white border-b border-blue-50/50 sticky top-0 z-30 shadow-sm flex-shrink-0">
-                        <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 bg-[#3182F6] rounded-2xl flex items-center justify-center text-white shadow-lg shadow-blue-100">
-                                <i data-lucide="file-search-2" size="22"></i>
-                            </div>
-                            <div>
-                                <h1 className="text-[17px] font-bold text-gray-900 leading-tight">파생상품규정 AI 봇</h1>
-                                <div className="flex items-center gap-1.5 mt-0.5 font-bold text-[#3182F6] text-[10px] tracking-widest uppercase">
-                                    해외주식파생부 국내파생팀 / KRX
-                                </div>
-                            </div>
-                        </div>
-                    </header>
-
-                    <main ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-6 space-y-7 no-scrollbar scroll-smooth">
-                        <AnimatePresence initial={false}>
-                            {messages.map((m) => (
-                                <motion.div key={m.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'} w-full`}>
-                                    <div className={`flex flex-col ${m.role === 'user' ? 'items-end' : 'items-start'} max-w-[88%]`}>
-                                        <div className={`px-5 py-3.5 rounded-[22px] bubble-box shadow-sm ${
-                                            m.role === 'user' 
-                                            ? 'bg-[#3182F6] text-white rounded-tr-none shadow-md' 
-                                            : 'bg-white text-gray-800 rounded-tl-none border border-blue-50/50'
-                                        }`}>
-                                            {renderContent(m.content)}
-                                        </div>
-                                        <div className="text-[10px] text-gray-400 mt-2 px-1 font-semibold opacity-60 uppercase">{m.time}</div>
-                                    </div>
-                                </motion.div>
-                            ))}
-                            {isLoading && (
-                                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex justify-start">
-                                    <div className="bg-white/60 backdrop-blur-sm px-5 py-3.5 rounded-[22px] rounded-tl-none flex items-center gap-3 border border-blue-50/30">
-                                        <div className="flex gap-1.5">
-                                            <div className="w-1.5 h-1.5 bg-blue-300 rounded-full animate-bounce" style={{animationDelay:'0ms'}}></div>
-                                            <div className="w-1.5 h-1.5 bg-blue-300 rounded-full animate-bounce" style={{animationDelay:'150ms'}}></div>
-                                            <div className="w-1.5 h-1.5 bg-blue-300 rounded-full animate-bounce" style={{animationDelay:'300ms'}}></div>
-                                        </div>
-                                        <span className="text-[12px] text-blue-400 font-bold">규정 검색 중</span>
-                                    </div>
-                                </motion.div>
-                            )}
-                        </AnimatePresence>
-                    </main>
-
-                    <div className="bg-white px-4 pt-3 pb-8 border-t border-blue-50/30 safe-bottom flex-shrink-0">
-                        <form onSubmit={handleSend} className="flex items-center gap-2 bg-[#F2F6FF] p-1.5 rounded-[24px] border border-transparent focus-within:border-[#3182F6] focus-within:bg-white transition-all shadow-inner w-full">
-                            <input type="text" value={input} onChange={(e) => setInput(e.target.value)} placeholder="질문을 입력하세요" className="flex-1 min-w-0 bg-transparent px-4 py-3 text-[15px] outline-none text-gray-800" />
-                            <button type="submit" disabled={!input.trim() || isLoading} className={`w-12 h-12 flex-shrink-0 rounded-[20px] flex items-center justify-center transition-all ${input.trim() && !isLoading ? 'bg-[#3182F6] text-white shadow-lg' : 'bg-gray-200 text-gray-400'}`}>
-                                <i data-lucide="arrow-up" size="22"></i>
-                            </button>
-                        </form>
-                    </div>
-                </div>
-            );
-        };
-
-        const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(<App />);
-    </script>
-</body>
-</html>
+<div class="ambient" aria-hidden="true"></div>
+<div class="workspace">
+<aside class="sidebar glass">
+ <a class="brand" href="/" aria-label="규정 데스크 홈"><span class="brand-icon">≋</span><span>규정 데스크<small>DOMESTIC DERIVATIVES</small></span></a>
+ <button class="new-button" data-new><span>＋</span> 새 질문 시작 <kbd>⌘ K</kbd></button>
+ <div class="side-caption">WORKSPACE</div><div class="nav-active"><span>▤</span> 규정 검색 <span class="dot"></span></div>
+ <div class="history-head">이번 세션의 질문 <span id="history-count">0</span></div><nav id="history" aria-label="질문 기록"><p class="muted small">질문한 내용이 여기에 쌓여요.</p></nav>
+ <div class="sidebar-bottom"><span class="avatar">국</span><div>국내파생팀<small>업무규정 리서치 공간</small></div></div>
+</aside>
+<main class="main">
+ <header class="topbar"><div><span class="breadcrumb">Workspace</span><span class="slash">/</span><b>규정 검색</b></div><div class="top-actions"><span class="status"><i></i> 업로드 자료 기반</span><button class="icon-button mobile-new" data-new aria-label="새 질문 시작">＋</button><button id="library-button" class="subtle-button">자료실 <span>↗</span></button></div></header>
+ <div class="reading" id="reading">
+ <section id="welcome" class="welcome">
+ <div class="eyebrow"><span class="mini-mark">✦</span> YOUR REGULATION DESK</div>
+ <h1>복잡한 규정도,<br><span>근거부터 명확하게.</span></h1>
+ <p class="intro">업무규정과 시행세칙을 함께 살펴보고,<br class="mobile-break"> 필요한 내용을 차분하게 정리해 드려요.</p>
+ <div class="suggestions"><button data-question="업무규정과 시행세칙의 목적을 설명해줘"><span class="suggest-icon">▤</span><strong>규정 이해하기</strong><small>업무규정과 시행세칙의 목적</small><span class="arrow">↗</span></button><button data-question="휴장일에 관한 규정을 찾아줘"><span class="suggest-icon">▦</span><strong>조문 찾아보기</strong><small>휴장일에 관한 규정</small><span class="arrow">↗</span></button><button data-question="시행세칙 제3조의3과 연결되는 업무규정을 설명해줘"><span class="suggest-icon">⤳</span><strong>관련 규정 연결</strong><small>시행세칙 제3조의3의 참조 조문</small><span class="arrow">↗</span></button></div>
+ <div class="data-note"><span class="tiny-dot"></span> 문서 2개 <span>·</span> 153페이지 <span>·</span> 본문 조문 560개</div>
+ </section>
+ <section id="messages" class="messages" aria-label="질문과 답변"></section>
+ </div>
+ <div class="composer-wrap"><form id="composer" class="composer glass"><label for="query" class="sr-only">규정 질문</label><textarea id="query" rows="1" maxlength="6000" placeholder="궁금한 규정을 물어보세요" enterkeyhint="send"></textarea><div class="composer-bottom"><span class="scope-tag">▧ 업무규정 + 시행세칙</span><div><span class="key-hint">Enter 전송 · Shift + Enter 줄바꿈</span><button id="send" class="send" type="submit" aria-label="질문 전송" disabled>↑</button><button id="stop" class="send stop" type="button" aria-label="답변 요청 중지" hidden>■</button></div></div></form><p class="footnote">업로드된 PDF 버전 기준 · 중요한 판단은 원문과 함께 확인하세요.</p></div>
+</main>
+<aside class="inspector glass" aria-label="근거 자료"><div class="panel-heading"><span>REFERENCE DESK</span><span>↗</span></div><div id="reference-panel"></div></aside>
+</div>
+<dialog id="reference-dialog" class="sheet"><div class="sheet-bar"></div><header><h2 id="dialog-title">자료실</h2><button class="icon-button" id="close-dialog" aria-label="닫기">✕</button></header><div id="dialog-content"></div></dialog>
+<div id="toast" class="toast glass" role="status"></div><div id="announcer" class="sr-only" role="status" aria-live="polite"></div>
+</body></html>
