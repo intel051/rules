@@ -13,7 +13,7 @@ export default async function handler(req,res){
  const key=process.env.GEMINI_API_KEY;
  // Without Gemini, still offer actual local search results, without pretending to interpret them.
  if(!key)return res.status(200).json({text:format('관련 자료를 찾았어요. 현재는 원문 검색 모드예요.','아래 검색된 원문을 펼쳐 확인해 주세요. AI 해석을 사용하려면 서버에 GEMINI_API_KEY를 설정해 주세요.',found.slice(0,6).map(r=>`${r.document} ${r.label} (${r.pages.join(', ')}쪽)`).join('\n'),warnings.join('\n')),sources,mode:'search_only'});
- const model=process.env.GEMINI_MODEL||'gemini-3.6-flash';
+ const model=process.env.GEMINI_MODEL||'gemini-3.8-flash';
  if(!/^[a-zA-Z0-9._-]+$/.test(model))return fail(500,'GEMINI_MODEL 설정을 확인해 주세요.');
  const instruction=`너는 업로드된 파생상품시장 규정의 검색 결과를 설명하는 AI야. KRX 직원이라고 주장하지 마.
 아래 검색 자료만 근거로 사용해. 웹 검색, 기억에 있는 규정, 추정 숫자로 빈칸을 채우지 마.
