@@ -1,5 +1,9 @@
 {
-  "rewrites": [
-    { "source": "/api/(.*)", "destination": "/api/$1" }
-  ]
+  "functions": {
+    "api/chat.js": {
+      "includeFiles": "data/**",
+      "maxDuration": 60
+    }
+  },
+  "outputDirectory": "public"
 }

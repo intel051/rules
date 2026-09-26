@@ -1,0 +1,30 @@
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+import {retrieve,records} from './lib/retrieve.js';
+import handler from './api/chat.js';
+const db=JSON.parse(readFileSync('data/regulations.json'));
+assert.deepEqual(db.documents.map(d=>d.page_count),[44,109]);
+assert.equal(new Set(records.map(r=>r.id)).size,records.length);
+assert.equal(records.filter(r=>r.kind==='article').length,560);
+assert(records.find(r=>r.document_id==='reg'&&r.label==='제119조'&&r.title==='삭제'));
+assert.equal(retrieve('휴장일')[0].label,'제5조');
+assert.equal(retrieve('시행세칙 제3조의3')[0].label,'제3조의3');
+assert(retrieve('시행세칙 제3조의3').some(r=>r.document_id==='reg'&&r.label==='제4조'));
+assert(retrieve('야간거래시간').some(r=>r.content_status==='title_only_missing_body'));
+assert(retrieve('코스피200 호가가격단위').slice(0,3).some(r=>r.label==='제4조의9'));
+async function run(body,method='POST'){const r={setHeader(){},status(s){this.code=s;return this},json(b){this.body=b;return this}};await handler({method,body},r);return r;}
+assert.equal((await run({},'GET')).code,405);
+assert.equal((await run({query:5})).code,400);
+delete process.env.GEMINI_API_KEY;
+assert.equal((await run({query:'휴장일'})).body.mode,'search_only');
+process.env.GEMINI_API_KEY='test-not-real';
+const id=retrieve('휴장일')[0].id;
+let answer={summary:'요약',detail:`자료 설명 [${id}]`,caution:'업로드 기준',sourceIds:[id]};
+globalThis.fetch=async(url,opts)=>{
+ const request=JSON.parse(opts.body);assert(!request.tools);assert(request.contents[0].parts[0].text.includes('evidence'));
+ return {ok:true,json:async()=>({candidates:[{finishReason:'STOP',content:{parts:[{text:JSON.stringify(answer)}]}}]})};
+};
+let r=await run({query:'휴장일'});assert.equal(r.code,200);assert(r.body.text.includes('**관련 조항**'));assert.equal(r.body.sources.length,1);
+answer={...answer,sourceIds:['made_up']};assert.equal((await run({query:'휴장일'})).code,502);
+answer={...answer,sourceIds:[]};assert.equal((await run({query:'휴장일'})).body.mode,'insufficient_evidence');
+console.log('Data coverage, retrieval, reference expansion and handler checks passed.');

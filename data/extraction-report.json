@@ -1,0 +1,16 @@
+{
+  "reg": {
+    "pages": 44,
+    "records": 271,
+    "articles": 238,
+    "supplements": 33,
+    "appendix_listings": 0
+  },
+  "rule": {
+    "pages": 109,
+    "records": 531,
+    "articles": 322,
+    "supplements": 144,
+    "appendix_listings": 65
+  }
+}
